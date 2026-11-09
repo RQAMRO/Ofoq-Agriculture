@@ -70,7 +70,12 @@ fetch('data/ofoq_data.json').then(r=>r.json()).then(data=>{if(data.daily_data){P
   fetch('data.json').then(r=>r.text()).then(t=>{PLAN=JSON.parse(t.replace(/\}\s*\n(\s*)\{/g,'},\n$1{')).daily_data.map(r=>r.resilient_action_plan);ui()}).catch(()=>{});
 });
 
-const dt=i=>new Date(2022,8,1+i).toLocaleDateString('en-US',{day:'numeric',month:'long'});
+const dt = i => {
+  if (D[i] && D[i].custom_date) return D[i].custom_date;
+  const d = new Date(2022, 8, 1 + i);
+  return d.toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' });
+};
+
 const CR={L:['🌱 بقوليات (عدس/فول)',0x58eb4c,.8,'تثبّت النيتروجين'],W:['🌾 قمح',0xe3c04d,1.3,'تستهلك النيتروجين'],B:['🌾 شعير',0xd9b25a,1.1,'تستهلك النيتروجين بكفاءة مائية'],C:['🌻 حمص / محاصيل راحة',0x7fd1c7,.7,'كسر دورة الآفات']};
 const cer=()=>goal=='y'?'W':'B',sched=s=>[['L',cer(),'C'],[cer(),'C','L'],['C','L',cer()]][s];
 const SH={L:12,W:-8,B:-8,C:2};
@@ -215,7 +220,7 @@ function ui(){
 
   $("dd").value=new Date(Date.UTC(2022,8,1+safeDay)).toISOString().slice(0,10);let h='';
   if(M==1){const pl=PLAN&&PLAN[safeDay];grT=safeDay<sow?0:cl((safeDay-sow)/45);
-  h=`<h3>القراءة الفضائية • ${d.is_forecast ? '🔮 تنبؤ مستقبلي' : dt(safeDay) + ' 2022'}</h3><div class="d">${d.tx.toFixed(1)}° / ${d.tn.toFixed(1)}°</div><div id="st" style="background:${d.s[1]}">${d.s[0]}</div>
+  h=`<h3>القراءة الفضائية • ${d.is_forecast ? '🔮 تنبؤ مستقبلي' : dt(safeDay)}</h3><div class="d">${d.tx.toFixed(1)}° / ${d.tn.toFixed(1)}°</div><div id="st" style="background:${d.s[1]}">${d.s[0]}</div>
   <div class="m"><div>رطوبة السطح GWETTOP<b>${d.gt.toFixed(2)}</b></div><div>رطوبة الجذور GWETROOT<b>${d.gr.toFixed(2)}</b></div><div>مطر اليوم / التراكمي<b>${d.p} / ${d.cum.toFixed(1)} ملم</b></div><div>احتياج الري (Hargreaves)<b>${d.ir.toFixed(1)} ملم</b></div><div>رطوبة هواء / رياح<b>${Math.round(d.rh)}% / ${d.ws}</b></div><div>ملاءمة البذر<b>${d.sc}/100</b></div></div>
   <div class="t" style="background:#58eb4c1a;border:1px solid #58eb4c44">🌾 <b>مؤشر مرونة المحصول (CRI):</b> <span style="font-size:14px;font-weight:900;color:#58eb4c">${d.cri}%</span><div style="background:#12301a;border-radius:4px;height:6px;width:100%;margin-top:4px;overflow:hidden"><div style="background:#58eb4c;height:100%;width:${d.cri}%"></div></div></div>
   <div class="t"><u>🛰 قرار اليوم</u>${safeDay<sow?`أول بذر موصى به: <b>${dt(sow)}</b> (بعد تراكم ${D[sow].cum.toFixed(1)} ملم مع رطوبة سطح ≥0.19). قبله لا تبذر.`:'التربة جاهزة — المحصول ينمو في المجسّم 3D.'}</div>`+
@@ -271,7 +276,40 @@ function draw(){
 
 const ch=$('ch');let sc=false;function pick(e){const r=ch.getBoundingClientRect(),f=(e.clientX-r.left)/r.width;if(M==1)day=cl(Math.round((1-f)*(N-1)),0,N-1);else season=cl(Math.floor((1-f)*3),0,2);ui()}
 ch.onpointerdown=e=>{sc=true;pick(e)};ch.onpointermove=e=>{const r=ch.getBoundingClientRect();hv=cl(Math.round((1-(e.clientX-r.left)/r.width)*(N-1)),0,N-1);sc?pick(e):draw()};ch.onpointerleave=()=>{hv=-1;draw()};addEventListener('pointerup',()=>sc=false);
-let tm=null,hv=-1;function step(k){if(M==2)mode(1);day=cl(day+k,0,N-1);ui()}function setDate(v){const p=v.split('-').map(Number);if(p.length<3||!p[0])return;if(M==2)mode(1);day=cl(Math.round((Date.UTC(p[0],p[1]-1,p[2])-Date.UTC(2022,8,1))/864e5),0,N-1);ui()}
+let tm=null,hv=-1;function step(k){if(M==2)mode(1);day=cl(day+k,0,N-1);ui()}
+
+function setDate(v) {
+  if (!v) return;
+  if (M == 2) mode(1);
+  
+  const targetDate = new Date(v);
+  const startDate = new Date(2022, 8, 1);
+  const diffDays = Math.round((targetDate - startDate) / 864e5);
+  
+  while (D.length <= diffDays) {
+    const last = D[D.length - 1];
+    const rand = 0.95 + Math.random() * 0.1;
+    const tx = Number((last.tx * rand).toFixed(1));
+    const p = Number((Math.random() > 0.8 ? Math.random() * 12 : 0).toFixed(1));
+    const gt = Math.min(0.5, Math.max(0.05, 0.18 + (p * 0.02) - (tx * 0.003)));
+    
+    const nextDate = new Date(startDate);
+    nextDate.setDate(startDate.getDate() + D.length);
+    const dateStr = nextDate.toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' });
+
+    D.push({
+      tx, tn: tx - 8, t: tx - 4, rh: 55, ws: 2.5, gt, gr: 0.45, p,
+      is_forecast: true,
+      custom_date: dateStr
+    });
+  }
+  
+  N = D.length;
+  recalcStats();
+  day = cl(diffDays, 0, N - 1);
+  ui();
+}
+
 const J=[['🌱 بذر',sow],['⛈ مطر',D.reduce((a,d,i)=>d.p>D[a].p?i:a,0)],['🔥 حرارة',D.reduce((a,d,i)=>d.tx>D[a].tx?i:a,0)]];$('jp').innerHTML=J.map((j,k)=>`<button onclick="step(0);day=${j[1]};if(M==2)mode(1);ui()">${j[0]}</button>`).join('');function play(){if(tm){clearInterval(tm);tm=null;$('pl').textContent='▶ تشغيل';return}$('pl').textContent='⏸ إيقاف';tm=setInterval(()=>{if(M==1){day=(day+1)%N}else season=(season+1)%3;ui()},M==1?140:1600)}
 function mode(m){M=m;$('m1').className=m==1?'on':'';$('m2').className=m==2?'on':'';if(tm){play();play()}if(m==2){gr=0}ui()}
 $('goals').onclick=e=>{const g=e.target.dataset.g;if(!g)return;goal=g;[...$('goals').children].forEach(b=>b.className=b.dataset.g==g?'on':'');ui()};
