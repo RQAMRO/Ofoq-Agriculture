@@ -1,102 +1,400 @@
-<!DOCTYPE html>
-<html lang="ar" dir="rtl">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ofoq (أفق) - الزراعة الذكية</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f4f7f6; color: #333; margin: 0; padding: 20px; }
-        .container { max-width: 1000px; margin: 0 auto; background: white; padding: 30px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
-        h1 { color: #2c7a3d; text-align: center; }
-        .info-box { background: #e8f5e9; padding: 20px; border-radius: 10px; margin: 20px 0; border-right: 5px solid #2c7a3d; }
-        .chart-container { position: relative; height: 400px; margin-top: 30px; }
-        .loading { text-align: center; color: #666; font-size: 18px; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>🌾 Ofoq (أفق) - نظام التنبؤ الزراعي</h1>
-        <div id="loading" class="loading">جاري تحميل البيانات من ناسا...</div>
-        
-        <div id="dashboard" style="display: none;">
-            <div class="info-box">
-                <h3>📍 الموقع: النصارية، نابلس، فلسطين</h3>
-                <p><strong>آخر تحديث:</strong> <span id="lastUpdated"></span></p>
-                <p><strong>التوصية الحالية:</strong> <span id="currentRec" style="font-weight: bold; font-size: 1.1em;"></span></p>
-            </div>
-            
-            <div class="chart-container">
-                <canvas id="soilChart"></canvas>
-            </div>
-        </div>
-    </div>
+<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><title>أفق Ofoiq — التوأم الرقمي للمزرعة</title>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{font-family:Cairo,sans-serif;background:#07140a;color:#eaf7e6;overflow:hidden;height:100vh;height:100dvh;width:100vw}
+#c{position:fixed;inset:0;width:100%;height:100%;cursor:grab;touch-action:none;z-index:1}
+.p{position:fixed;background:rgba(8,26,14,.82);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:1px solid #58eb4c33;border-radius:14px;padding:10px;z-index:5}
+#top{top:8px;right:8px;left:8px;display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap;padding:8px 12px}
+b.l{font-size:18px;font-weight:900}
+button{font:700 11px Cairo;color:#cfe;background:#12301a;border:1px solid #58eb4c44;border-radius:8px;padding:6px 10px;cursor:pointer;white-space:nowrap;transition:all .2s ease}
+button.on{background:#58eb4c;color:#07140a;border-color:#58eb4c}.g{display:flex;gap:5px;flex-wrap:wrap}
+#info{top:75px;right:8px;width:320px;max-height:calc(100vh - 270px);max-height:calc(100dvh - 270px);overflow-y:auto;overflow-x:hidden}
+#roi{top:75px;left:8px;width:220px}
+#bot{bottom:8px;left:8px;right:8px;padding:8px}
+h3{font-size:12px;color:#58eb4c;margin-bottom:4px}.d{font-size:18px;font-weight:900}
+#st{display:inline-block;padding:4px 10px;border-radius:99px;font-weight:900;font-size:12px;margin:4px 0;color:#07140a}
+.m{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin:6px 0}.m div{background:#ffffff0d;border-radius:8px;padding:5px 7px;font-size:10px}.m b{display:block;font-size:13px}
+.t{font-size:10.5px;line-height:1.6;background:#ffffff0d;border-radius:8px;padding:6px 8px;margin-top:4px}.t u{text-decoration:none;color:#58eb4c;font-weight:900;display:block}
+#ch{width:100%;height:110px;display:block;cursor:pointer}.big{font-size:20px;font-weight:900;color:#58eb4c}
+input[type=range]{width:100%;accent-color:#58eb4c}.sw{display:inline-block;width:8px;height:8px;border-radius:2px;margin-left:4px}
 
-    <script>
-        // جلب البيانات من ملف JSON الذي يولده البايثون
-        fetch('./data/ofoq_data.json')
-            .then(response => response.json())
-            .then(data => {
-                document.getElementById('loading').style.display = 'none';
-                document.getElementById('dashboard').style.display = 'block';
-                
-                document.getElementById('lastUpdated').textContent = data.metadata.last_updated;
-                
-                const todayData = data.daily_data[data.daily_data.length - 1];
-                document.getElementById('currentRec').textContent = todayData.Recommendation;
-                
-                // إعداد الرسم البياني
-                const ctx = document.getElementById('soilChart').getContext('2d');
-                const labels = data.daily_data.map(d => d.DATE);
-                const soilData = data.daily_data.map(d => d.GWETROOT);
-                const isForecast = data.daily_data.map(d => d.is_forecast);
-                
-                // فصل الألوان للتاريخي والمتوقع
-                const pointColors = isForecast.map(f => f ? '#f39c12' : '#2c7a3d');
-                const lineColors = isForecast.map((f, i, arr) => {
-                    if (i === 0) return '#2c7a3d';
-                    return f ? '#f39c12' : '#2c7a3d';
-                });
+@media(max-width:768px){
+  #top{padding:6px 8px;gap:4px}
+  b.l small{font-size:9.5px}
+  #logo-ofoiq{height:38px!important}
+  #roi{display:none}
+  #info{width:calc(100vw - 16px);right:8px;left:8px;top:auto;bottom:185px;max-height:28vh;z-index:6}
+  #bot{bottom:4px;left:4px;right:4px;padding:6px}
+  #ch{height:90px}
+  button{padding:5px 8px;font-size:10px}
+}
+</style></head><body><canvas id="c"></canvas>
+<div class="p" id="top"><b class="l" style="display:flex;align-items:center;gap:8px"><svg id="logo-ofoiq" viewBox="0 0 400 300" style="height:44px;width:auto;background:#eaf7e6;border-radius:8px;padding:2px 6px;flex-shrink:0"><path d="M 120 100 L 210 65 L 300 100 L 285 110 L 285 140 C 285 140, 275 160, 265 140 L 265 125 L 230 148 C 230 148, 220 162, 195 162 C 170 162, 150 148, 150 148 L 138 128 L 138 170 C 138 185, 170 200, 205 200 C 240 200, 270 185, 270 170 C 270 170, 240 182, 150 170 L 150 142 L 120 100 Z" fill="#0a522c"/><path d="M 80 200 C 140 150, 270 150, 330 200 C 260 172, 150 172, 80 200 Z" fill="#0a522c"/><text x="205" y="275" font-family="Cairo" font-weight="900" font-size="65" fill="#0a522c" text-anchor="middle">أفق</text></svg><small style="font-size:10px;font-weight:400;color:#9cb;line-height:1.3">Ofoiq<br>مزرعة النصارية — نابلس • NASA POWER</small></b>
+<div class="g" style="z-index: 10;">
+  <button onclick="triggerCrisis('dry')" style="background:#ff6a3c; color:#fff; border-color:#ff6a3c; font-weight:900;">🔥 سيناريو الإجهاد الحراري</button>
+  <button onclick="triggerCrisis('rain')" style="background:#4aa3ff; color:#fff; border-color:#4aa3ff; font-weight:900;">🌧️ سيناريو الأمطار الغزيرة</button>
+  <button id="btn-heatmap" onclick="toggleHeatmap()" style="background:#20b2aa; color:#fff; border-color:#20b2aa; font-weight:900;">🗺️ الخريطة الحرارية</button>
+</div>
+<div class="g"><button id="m1" class="on" onclick="mode(1)">📡 اليوم بيوم</button><button id="m2" onclick="mode(2)">🔄 3 مواسم</button></div>
+<div class="g" id="goals"><button class="on" data-g="w">💧 مياه</button><button data-g="y">📈 إنتاج</button><button data-g="d">☀️ جفاف</button></div></div>
+<div class="p" id="info"></div><div class="p" id="tip" style="display:none;pointer-events:none;z-index:9;padding:6px 10px;font-size:11px;line-height:1.5;max-width:220px"></div>
+<div class="p" id="roi"><h3>🧮 الأثر على مزرعتك</h3><div style="font-size:11px">المساحة: <b id="dv">5</b> دونم</div><input type="range" id="dr" min="1" max="50" value="5"><div class="m"><div>💧 مياه موفّرة<b class="big" id="rw"></b></div><div>💰 وفر مالي<b class="big" id="rm"></b></div></div><div class="t" id="rt"></div></div>
+<div class="p" id="bot"><canvas id="ch"></canvas><div class="g" style="margin-top:6px;justify-content:space-between;align-items:center"><div class="g" style="align-items:center;flex-wrap:wrap"><button id="pl" onclick="play()">▶ تشغيل</button><button onclick="step(-1)">← السابق</button><input type="date" id="dd" min="2022-09-01" max="2022-12-31" value="2022-09-01" onchange="setDate(this.value)" style="font:700 11px Cairo;background:#12301a;color:#eaf7e6;border:1px solid #58eb4c66;border-radius:6px;padding:3px 6px;color-scheme:dark"><button onclick="step(1)">التالي →</button><span id="jp" class="g"></span></div><div id="leg" style="font-size:10px;color:#9cb;display:none"><span class="sw" style="background:#58eb4c"></span>بذر <span class="sw" style="background:#4aa3ff"></span>مطر <span class="sw" style="background:#ff8a3c"></span>حرارة</div></div></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+const DATA=[[41.47,24.76,31.4,56,2.85,0.09,0.45,0.0],[41.5,24.44,31.24,56,2.87,0.09,0.45,0.0],[41.01,24.48,30.98,57,2.96,0.09,0.45,0.0],[40.11,23.91,30.27,56,3.39,0.09,0.45,0.0],[39.24,22.97,29.44,57,2.94,0.09,0.45,0.0],[36.39,22.8,28.41,59,3.23,0.1,0.45,0.28],[36.7,22.89,28.96,55,2.92,0.1,0.45,0.01],[38.46,22.5,29.52,53,2.7,0.1,0.45,0.0],[39.96,21.78,29.36,51,3.35,0.1,0.45,0.0],[39.33,21.57,28.88,53,3.04,0.1,0.45,0.0],[38.87,21.14,28.32,54,2.6,0.1,0.45,0.0],[37.6,20.59,27.66,54,2.52,0.1,0.45,0.0],[36.74,22.35,28.15,60,3.07,0.1,0.45,0.0],[35.42,22.58,27.46,55,3.36,0.1,0.45,0.0],[35.74,20.59,27.25,50,2.49,0.1,0.45,0.0],[38.51,20.21,28.35,51,2.85,0.1,0.45,0.0],[39.31,20.77,28.41,57,2.87,0.1,0.45,0.0],[36.8,21.59,28.17,61,2.97,0.1,0.45,0.0],[35.44,22.1,27.57,59,3.36,0.1,0.45,0.0],[35.04,21.13,27.03,59,3.38,0.1,0.45,0.0],[33.01,20.61,25.86,56,3.55,0.1,0.45,0.0],[34.15,20.13,26.19,50,2.79,0.1,0.45,0.0],[36.55,21.74,27.97,43,2.51,0.1,0.45,0.0],[37.83,21.55,28.63,38,2.83,0.1,0.45,0.0],[38.19,22.71,29.26,32,2.76,0.1,0.45,0.0],[39.47,23.54,29.92,27,2.42,0.1,0.45,0.0],[37.72,22.34,28.43,37,2.82,0.1,0.45,0.0],[35.0,20.39,26.45,48,2.92,0.1,0.45,0.0],[37.71,19.87,27.47,53,3.54,0.1,0.45,0.0],[39.49,20.79,28.99,49,3.06,0.1,0.45,0.0],[39.33,23.79,29.98,43,2.81,0.09,0.45,0.0],[37.19,22.35,28.41,59,2.32,0.09,0.45,0.0],[36.65,20.82,27.95,57,2.74,0.09,0.45,0.0],[36.61,21.6,27.75,59,2.53,0.09,0.45,0.0],[36.22,21.18,27.01,58,2.52,0.09,0.45,0.0],[35.55,19.74,26.25,58,2.16,0.09,0.45,0.0],[33.65,20.28,25.66,58,3.06,0.09,0.45,0.0],[31.77,19.35,24.53,55,3.06,0.09,0.45,0.0],[31.69,20.26,24.59,53,2.43,0.09,0.45,0.0],[31.11,18.0,23.73,54,2.06,0.09,0.45,0.0],[33.36,17.64,24.67,58,2.74,0.09,0.45,0.0],[33.16,18.52,24.84,57,2.44,0.09,0.45,0.0],[31.38,18.9,24.08,62,2.74,0.09,0.45,0.0],[31.15,17.13,23.63,62,2.17,0.09,0.45,0.0],[31.59,20.09,24.7,54,1.48,0.09,0.45,0.0],[34.7,19.1,26.2,38,2.79,0.09,0.45,0.0],[32.94,21.18,25.68,48,2.65,0.09,0.45,0.0],[31.46,18.85,24.43,60,2.22,0.09,0.45,0.0],[32.63,18.96,24.66,56,2.56,0.09,0.45,0.0],[31.4,18.46,24.15,59,2.71,0.11,0.45,1.38],[29.57,19.94,24.04,62,2.15,0.19,0.46,1.17],[30.31,18.39,23.36,65,2.36,0.2,0.46,0.05],[31.34,17.67,23.61,60,2.56,0.2,0.46,0.0],[30.27,18.09,23.4,63,1.97,0.2,0.46,0.01],[30.49,18.71,24.08,49,5.73,0.19,0.46,0.77],[31.6,20.93,25.06,49,3.56,0.23,0.46,0.31],[30.85,18.57,23.65,57,2.33,0.23,0.46,0.0],[31.51,17.07,23.61,50,1.77,0.22,0.46,0.0],[33.21,19.35,25.07,38,2.67,0.22,0.46,0.0],[30.92,18.24,23.83,49,2.62,0.21,0.46,0.0],[29.66,18.64,23.0,60,2.16,0.21,0.46,0.0],[28.3,16.45,21.46,63,2.24,0.21,0.46,0.2],[27.08,15.92,20.47,68,2.53,0.21,0.46,0.05],[27.72,16.04,20.74,65,1.59,0.21,0.46,0.0],[28.24,16.04,20.74,54,2.02,0.21,0.46,0.0],[30.29,16.08,21.89,43,2.29,0.2,0.46,0.0],[31.09,16.17,23.08,45,2.63,0.2,0.46,0.0],[27.08,16.98,20.89,58,2.59,0.2,0.46,0.0],[24.69,15.3,19.2,67,3.15,0.31,0.47,4.72],[24.1,14.83,18.58,74,1.95,0.4,0.47,2.06],[25.31,13.91,18.42,66,1.86,0.4,0.47,0.07],[27.88,13.88,19.31,53,2.46,0.39,0.47,0.0],[28.35,13.46,20.13,44,3.38,0.37,0.47,0.0],[29.46,16.69,22.27,51,4.24,0.35,0.47,0.01],[28.07,18.4,22.07,62,2.81,0.35,0.47,0.54],[25.88,17.07,20.51,65,2.81,0.35,0.47,0.1],[23.91,15.2,18.62,64,2.64,0.34,0.47,0.04],[24.11,14.04,18.2,64,1.93,0.33,0.46,0.0],[25.66,13.1,18.56,51,2.1,0.32,0.46,0.0],[27.29,13.47,19.4,45,3.5,0.31,0.46,0.0],[27.26,12.51,18.67,39,5.15,0.29,0.46,0.0],[29.67,13.45,20.98,40,4.67,0.28,0.46,0.0],[26.62,15.43,19.71,59,2.91,0.28,0.46,0.02],[27.31,12.2,19.4,57,2.22,0.28,0.46,0.28],[23.33,14.35,18.58,66,2.79,0.31,0.46,1.91],[20.74,11.32,15.58,77,4.55,0.48,0.48,15.13],[21.94,12.78,16.45,72,3.09,0.53,0.5,4.0],[23.09,10.91,16.73,64,4.02,0.48,0.5,0.0],[23.46,13.35,18.28,58,4.02,0.48,0.5,0.0],[23.36,14.14,17.74,68,2.49,0.5,0.49,2.78],[22.8,11.02,16.46,72,1.99,0.48,0.5,0.22],[24.39,10.66,16.62,59,2.41,0.48,0.5,0.09],[24.42,10.29,16.3,58,3.05,0.48,0.49,0.19],[23.67,10.33,15.61,59,3.86,0.48,0.49,0.04],[23.93,10.48,16.61,58,2.95,0.47,0.49,0.0],[23.33,9.85,15.51,64,2.53,0.47,0.49,0.0],[20.88,11.55,15.7,74,1.5,0.48,0.49,0.69],[21.59,10.4,15.96,73,1.84,0.48,0.49,0.0],[23.31,10.04,15.89,64,2.09,0.47,0.49,0.0],[23.03,11.43,16.17,64,1.99,0.47,0.49,0.0],[23.75,10.14,16.38,58,2.24,0.47,0.49,0.0],[25.21,9.86,16.3,55,3.43,0.47,0.48,0.0],[24.08,13.18,17.82,45,1.96,0.47,0.48,0.0],[23.7,13.55,17.62,56,1.9,0.47,0.48,0.0],[21.42,13.32,16.73,73,1.8,0.47,0.48,0.09],[23.31,13.43,17.34,69,1.58,0.47,0.48,0.1],[24.83,11.56,17.53,58,2.42,0.46,0.48,0.0],[24.88,11.52,16.83,59,3.99,0.45,0.48,0.0],[24.33,10.7,15.87,55,4.26,0.45,0.48,0.0],[24.24,9.04,15.13,51,4.29,0.43,0.47,0.0],[23.89,9.23,15.13,56,2.83,0.42,0.47,0.0],[21.31,10.37,15.12,73,1.78,0.43,0.47,0.69],[20.89,9.73,14.78,71,2.49,0.43,0.47,0.18],[20.14,9.53,13.66,63,3.9,0.44,0.47,0.92],[19.01,9.0,13.31,80,2.17,0.46,0.48,2.57],[16.73,9.28,12.81,85,2.36,0.49,0.48,1.78],[15.98,7.97,11.3,89,3.97,0.54,0.49,9.05],[18.21,6.47,11.46,78,3.05,0.49,0.5,0.21],[18.71,8.2,13.0,74,1.02,0.48,0.5,0.04],[19.67,6.19,11.89,66,3.45,0.48,0.49,0.0],[18.81,6.02,11.37,63,4.95,0.48,0.49,0.0],[19.96,6.51,12.17,65,4.75,0.48,0.49,0.0]];
+const $=i=>document.getElementById(i),cl=(x,a=0,b=1)=>Math.max(a,Math.min(b,x));
+let D=DATA.map(r=>({tx:r[0],tn:r[1],t:r[2],rh:r[3],ws:r[4],gt:r[5],gr:r[6],p:r[7],is_forecast:false}));
+let N=D.length;
+let cum=0,sow=N-1,base=0,smart=0,heatmapActive=false;
 
-                new Chart(ctx, {
-                    type: 'line',
-                    data: {
-                        labels: labels,
-                        datasets: [{
-                            label: 'رطوبة التربة (GWETROOT)',
-                            data: soilData,
-                            borderColor: '#2c7a3d',
-                            segment: {
-                                borderColor: ctx => isForecast[ctx.p0DataIndex] ? '#f39c12' : '#2c7a3d',
-                                borderDash: ctx => isForecast[ctx.p0DataIndex] ? [6, 6] : undefined,
-                            },
-                            pointBackgroundColor: pointColors,
-                            fill: false,
-                            tension: 0.3
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                            title: { display: true, text: 'تطور رطوبة التربة: بيانات حقيقية (أخضر) + توقعات 7 أيام (برتقالي متقطع)', font: { size: 16 } },
-                            annotation: {
-                                annotations: {
-                                    line1: { type: 'line', yMin: 0.47, yMax: 0.47, borderColor: 'red', borderDash: [5, 5], label: { content: 'حد التشبع', enabled: true } },
-                                    line2: { type: 'line', yMin: 0.19, yMax: 0.19, borderColor: 'orange', borderDash: [5, 5], label: { content: 'حد الجفاف', enabled: true } }
-                                }
-                            }
-                        },
-                        scales: {
-                            y: { min: 0, max: 0.6, title: { display: true, text: 'مستوى الرطوبة' } }
-                        }
-                    }
-                });
-            })
-            .catch(error => {
-                document.getElementById('loading').textContent = '❌ حدث خطأ في تحميل البيانات. تأكد من وجود مجلد data/ وملف ofoq_data.json';
-                console.error(error);
-            });
-    </script>
-</body>
-</html>
+function stat(d){if(d.p>=9)return['⚠️ خطر انجراف — لا تحرث، ثبّت التربة','#4aa3ff'];if(d.gt>=.4)return['💧 تشبّع — أوقف الري وصرّف المياه','#4aa3ff'];if(d.tx>=35&&d.gt<.15)return['🔥 إجهاد حراري وجفاف — ري فجري + تغطية','#ff6a3c'];if(d.gt>=.19&&d.tx<=31)return['✅ نافذة بذر مثالية','#58eb4c'];if(d.gt<.15)return['⏳ جفاف — انتظر المطر وجهّز الأرض','#f0b43c'];return['🌤 ظروف مقبولة — راقب الرطوبة','#c8e06a']}
+
+function recalcStats(){
+  cum=0; sow=N-1; base=0; smart=0;
+  D.forEach((d,i)=>{
+    cum+=d.p;d.cum=cum;const Ra=9.5+4.5*Math.cos((244+i-172)*6.283/365);
+    d.et=.0023*Ra*(d.t+17.8)*Math.sqrt(Math.max(d.tx-d.tn,1))*.8;
+    d.ir=d.gt>=.4?0:Math.max(0,d.et-d.p);base+=d.et;smart+=d.ir;
+    d.sc=Math.round(100*(.4*(1-cl(Math.abs(d.t-18)/14))+.4*cl(d.gt/.22)*(d.gt>.45?.6:1)+.2*(d.p>9?0:1)));
+    const p7 = D.slice(Math.max(0, i-6), i+1).reduce((a,b)=>a+b.p, 0);
+    d.cri = Math.round(cl(0.35 * cl(p7/25) + 0.25 * (1 - cl((d.tx-15)/25)) + 0.20 * cl(d.gt/0.3) + 0.20 * cl(d.gr/0.45)) * 100);
+    d.s=stat(d);if(sow==N-1&&d.cum>=5&&d.gt>=.19)sow=i
+  });
+}
+recalcStats();
+
+const sav=1-smart/base;let PLAN=null,day=0,M=1,goal='w',gr=0,grT=0,season=0;
+fetch('data.json').then(r=>r.text()).then(t=>{PLAN=JSON.parse(t.replace(/\}\s*\n(\s*)\{/g,'},\n$1{')).daily_data.map(r=>r.resilient_action_plan);ui()}).catch(()=>{});
+const dt=i=>new Date(2022,8,1+i).toLocaleDateString('en-US',{day:'numeric',month:'long'});
+const CR={L:['🌱 بقوليات (عدس/فول)',0x58eb4c,.8,'تثبّت النيتروجين'],W:['🌾 قمح',0xe3c04d,1.3,'تستهلك النيتروجين'],B:['🌾 شعير',0xd9b25a,1.1,'تستهلك النيتروجين بكفاءة مائية'],C:['🌻 حمص / محاصيل راحة',0x7fd1c7,.7,'كسر دورة الآفات']};
+const cer=()=>goal=='y'?'W':'B',sched=s=>[['L',cer(),'C'],[cer(),'C','L'],['C','L',cer()]][s];
+const SH={L:12,W:-8,B:-8,C:2};
+
+// ---------- 3D Engine ----------
+const R=new THREE.WebGLRenderer({canvas:$('c'),antialias:true});R.setPixelRatio(Math.min(devicePixelRatio,2));
+const S=new THREE.Scene(),cam=new THREE.PerspectiveCamera(48,1,.1,200);S.fog=new THREE.Fog(0x9ec5e8,16,45);S.background=new THREE.Color(0x9ec5e8);
+const sun=new THREE.DirectionalLight(0xffffff,1);sun.position.set(6,10,4);S.add(sun,new THREE.HemisphereLight(0xcfe8ff,0x4a3a22,.7));
+const gnd=new THREE.Mesh(new THREE.CircleGeometry(30,48),new THREE.MeshLambertMaterial({color:0x5a6b3a}));gnd.rotation.x=-1.5708;gnd.position.y=-.2;S.add(gnd);
+const sunB=new THREE.Mesh(new THREE.SphereGeometry(.9,16,16),new THREE.MeshBasicMaterial({color:0xffd27a}));sunB.position.set(-9,9,-14);S.add(sunB);
+const plots=[],geo=new THREE.BoxGeometry(1.9,.3,1.9);
+for(let b=0;b<3;b++)for(let k=0;k<4;k++){const m=new THREE.Mesh(geo,new THREE.MeshLambertMaterial({color:0xc19a62}));m.position.set((k-1.5)*2.1,0,(b-1)*2.5);S.add(m);plots.push({m,b,k})}
+const spr=[],cov=[],pipe=[],warnSign=[];
+function createWarnMesh(){
+  const g = new THREE.Group();
+  const m1 = new THREE.Mesh(new THREE.CylinderGeometry(.08,.08,.6,8), new THREE.MeshBasicMaterial({color: 0xff3333}));
+  m1.position.y = 2.4;
+  const m2 = new THREE.Mesh(new THREE.SphereGeometry(.1,8,8), new THREE.MeshBasicMaterial({color: 0xff3333}));
+  m2.position.y = 1.95;
+  g.add(m1, m2);
+  g.visible = false;
+  return g;
+}
+
+for(let b=0;b<3;b++){const z=(b-1)*2.5,pm=new THREE.Mesh(new THREE.CylinderGeometry(.04,.04,8.6,8),new THREE.MeshLambertMaterial({color:0x777777}));pm.rotation.z=1.5708;pm.position.set(0,1.6,z);S.add(pm);pipe.push(pm);
+const g=new THREE.BufferGeometry(),a=new Float32Array(450);for(let i=0;i<150;i++)a.set([(Math.random()-.5)*8.4,Math.random()*1.4+.2,z+(Math.random()-.5)*1.8],i*3);g.setAttribute('position',new THREE.BufferAttribute(a,3));
+const pt=new THREE.Points(g,new THREE.PointsMaterial({color:0x6ec0ff,size:.09,transparent:true,opacity:.9}));pt.visible=false;S.add(pt);spr.push(pt);
+const cm=new THREE.Mesh(new THREE.CylinderGeometry(1,1,8.6,24,1,true,0,Math.PI),new THREE.MeshLambertMaterial({color:0xdff6ff,transparent:true,opacity:.28,side:THREE.DoubleSide,depthWrite:false}));cm.rotation.z=1.5708;cm.position.set(0,.15,z);cm.scale.set(.001,1,.98);cm.visible=false;S.add(cm);cov.push(cm);
+const wm=createWarnMesh();wm.position.set(0,0,z);S.add(wm);warnSign.push(wm);}
+
+const blk=[0,1,2].map(()=>({irr:0,cov:0,a:.001,w:0})),BR=new THREE.Color(0x8a6a2b);let sel=-1,hm=null,sx=0,sy=0;
+function E(b,d){const k=blk[b],ge=cl(d.gt+(k.irr?.16:0)+(k.cov?.04:0)),tx=d.tx-(k.cov?4:0);return{ge,tx,s:cl((.15-ge)/.1)*cl((tx-28)/8)}}
+const per=16,st=new THREE.InstancedMesh(new THREE.CylinderGeometry(.03,.06,1,5),new THREE.MeshLambertMaterial({color:0xffffff}),12*per),tmp=new THREE.Object3D(),col=new THREE.Color();S.add(st);
+const ph=[];for(let i=0;i<12*per;i++)ph.push(Math.random()*6.28);
+const RN=500,rp=new Float32Array(RN*3);for(let i=0;i<RN;i++)rp.set([(Math.random()-.5)*14,Math.random()*9,(Math.random()-.5)*10],i*3);
+const rg=new THREE.BufferGeometry();rg.setAttribute('position',new THREE.BufferAttribute(rp,3));
+const rain=new THREE.Points(rg,new THREE.PointsMaterial({color:0x9fd0ff,size:.07,transparent:true,opacity:.8}));S.add(rain);
+let th=.6,ph2=.95,rad=15,drag=false,auto=true,lx=0,ly=0;const cv=$('c');
+
+cv.onpointerdown=e=>{sx=e.clientX;sy=e.clientY;drag=true;auto=false;lx=e.clientX;ly=e.clientY};
+onpointerup=()=>drag=false;
+onpointermove=e=>{if(!drag)return;th-=(e.clientX-lx)*.008;ph2=cl(ph2-(e.clientY-ly)*.006,.3,1.4);lx=e.clientX;ly=e.clientY};
+
+const RC=new THREE.Raycaster(),mv2=new THREE.Vector2(),pms=plots.map(p=>p.m),bOf=m=>plots.find(p=>p.m==m).b;
+function hover(e){const r=cv.getBoundingClientRect();mv2.set((e.clientX-r.left)/r.width*2-1,-(e.clientY-r.top)/r.height*2+1);RC.setFromCamera(mv2,cam);const h=RC.intersectObjects(pms)[0],tp=$('tip');hm=h&&!drag?h.object:null;if(!hm){tp.style.display='none';cv.style.cursor=drag?'grabbing':'grab';return}cv.style.cursor='pointer';tp.innerHTML=tipH(bOf(hm));tp.style.display='block';tp.style.left=Math.min(e.clientX+14,innerWidth-230)+'px';tp.style.top=Math.min(e.clientY+14,innerHeight-170)+'px'}
+cv.addEventListener('pointermove',hover);cv.addEventListener('pointerleave',()=>{hm=null;$('tip').style.display='none'});
+cv.addEventListener('click',e=>{if(Math.hypot(e.clientX-sx,e.clientY-sy)>5||!hm)return;const b=bOf(hm);setSel(sel==b?-1:b)});
+cv.onwheel=e=>{e.preventDefault();rad=cl(rad+e.deltaY*.01,7,24)};
+
+const cDry=new THREE.Color(0xc19a62),cWet=new THREE.Color(0x3a2616),cSat=new THREE.Color(0x2b3a44),hot=new THREE.Color(0xe9b47c),cool=new THREE.Color(0x8fb8dc),gry=new THREE.Color(0x74828f),sk=new THREE.Color();
+
+function frame(t){
+  requestAnimationFrame(frame);
+  t*=.001;
+  const w=innerWidth,h=innerHeight;
+  if(R.domElement.width!=w*R.getPixelRatio()){R.setSize(w,h,false);cam.aspect=w/h;cam.updateProjectionMatrix()}
+  if(auto)th+=.0016;
+  cam.position.set(rad*Math.sin(th)*Math.sin(ph2),rad*Math.cos(ph2),rad*Math.cos(th)*Math.sin(ph2));
+  cam.lookAt(0,.3,0);
+  
+  const safeDay = Math.min(day, D.length - 1);
+  const d = D[M==1 ? safeDay : Math.min(N-1, sow+30)];
+  if(!d) return;
+
+  const wet=cl(d.gt/.5);
+  gr+=(grT-gr)*.04;
+  sk.copy(cool).lerp(hot,cl((d.tx-18)/22)).lerp(gry,cl(d.p/6)*.6);
+  S.background.copy(sk);S.fog.color.copy(sk);
+  sun.intensity=.5+cl(d.tx/45)*.8;
+  sunB.material.color.setHex(d.tx>35?0xff9a3c:0xffd27a);
+  
+  const ef=[0,1,2].map(b=>{
+    const e=E(b,d),k=blk[b];
+    k.w+=(e.s-k.w)*.05;
+    k.a+=((k.cov?1.8:.001)-k.a)*.08;
+    cov[b].scale.x=k.a;
+    cov[b].visible=k.a>.01;
+    spr[b].visible=!!k.irr;
+    pipe[b].material.color.setHex(k.irr?0x4aa3ff:0x777777);
+    if(k.irr){
+      const a=spr[b].geometry.attributes.position.array;
+      for(let i=1;i<a.length;i+=3){a[i]-=.07;if(a[i]<.2)a[i]=1.6}
+      spr[b].geometry.attributes.position.needsUpdate=true
+    }
+    const reqIrr = d.ir>=1.5&&d.gt<.4, reqCov = d.tx>=35||d.p>=9;
+    const needsAction = (reqIrr && !k.irr) || (reqCov && !k.cov);
+    warnSign[b].visible = needsAction;
+    if(needsAction){ warnSign[b].position.y = Math.sin(t*5)*0.1; }
+    return e
+  });
+
+  plots.forEach(p=>{
+    const e=ef[p.b];
+    let localFactor = 1.0;
+    if(heatmapActive){ localFactor = (p.k === 0 || p.k === 3) ? 0.7 : 1.2; }
+    const localGe = cl(e.ge * localFactor);
+    p.m.material.color.copy(cDry).lerp(cWet,cl(localGe/.5)).lerp(cSat,localGe>.4?(localGe-.4)*3:0);
+    if(heatmapActive && localGe < 0.12) p.m.material.color.setHex(0xff4444);
+    p.m.material.emissive.setHex(p.m===hm?0x1f4a1f:sel==p.b?0x123a12:0)
+  });
+
+  const sc=M==1?sched(0):sched(season);
+  plots.forEach((p,pi)=>{
+    const c=CR[sc[p.b]],kw=blk[p.b].w,g=Math.max(.001,c[2]*gr*(1-.4*kw));
+    for(let j=0;j<per;j++){
+      const i=pi*per+j;
+      tmp.position.set(p.m.position.x+((j%4)-1.5)*.42,.15+g*.5,p.m.position.z+(((j/4)|0)-1.5)*.42);
+      tmp.scale.set(1,g,1);
+      tmp.rotation.z=Math.sin(t*1.5+ph[i])*.06*(1+d.ws/3)+kw*.6*(j%2?1:-1);
+      tmp.updateMatrix();
+      st.setMatrixAt(i,tmp.matrix);
+      st.setColorAt(i,col.setHex(c[1]).offsetHSL(0,0,(ph[i]%.3)-.15).lerp(BR,kw*.8))
+    }
+  });
+  st.instanceMatrix.needsUpdate=true;
+  st.instanceColor.needsUpdate=true;
+  
+  const a=rg.attributes.position.array;
+  for(let i=0;i<RN;i++){a[i*3+1]-=.25;if(a[i*3+1]<0)a[i*3+1]=9}
+  rg.attributes.position.needsUpdate=true;
+  rg.setDrawRange(0,d.p>0?Math.floor(RN*cl(d.p/10+.2)):0);
+  R.render(S,cam);
+}
+
+// ---------- UI Engine ----------
+const cd=()=>D[M==1?Math.min(day, D.length-1):Math.min(N-1,sow+30)],tg=()=>sel<0?[0,1,2]:[sel];
+function setSel(k){sel=k;ui()}function act(y){const t=tg(),v=!t.every(b=>blk[b][y]);t.forEach(b=>blk[b][y]=v?1:0);ui()}
+function tipH(b){const d=cd(),e=E(b,d),k=blk[b],c=CR[(M==1?sched(0):sched(season))[b]];
+const rec=e.s>.3&&!k.irr&&!k.cov?'⚠️ إجهاد حراري وجفاف: شغّل الري الفجري أو غطِّ المحصول':k.irr&&d.gt>=.4?'🛑 تشبّع: أوقف الري':d.p>=9&&!k.cov?'🌧 مطر غزير: غطِّ التربة لتجنب الانجراف':'✅ الوضع مستقر';
+const g={w:`💧 احتياج الماء اليوم: <b>${d.ir.toFixed(1)} ملم</b>`,y:`📈 ${c[3]}`,d:'☀️ التغطية تخفّض الحرارة ~4° وتقلل التبخر'}[goal];
+return `<b style="color:#58eb4c">قطاع ${'ABC'[b]} — ${c[0]}</b><br>رطوبة التربة: <b>${e.ge.toFixed(2)}</b> • حرارة: <b>${e.tx.toFixed(0)}°</b><br>ري: <b>${k.irr?'يعمل 💦':'متوقف'}</b> • تغطية: <b>${k.cov?'مفعّلة':'لا'}</b><br>${g}<br>${rec}<br><small style="color:#9cb">اضغط لاختيار القطاع</small>`}
+function actH(){const d=cd(),t=tg(),I=t.every(b=>blk[b].irr),C=t.every(b=>blk[b].cov),rI=d.ir>=1.5&&d.gt<.4,rC=d.tx>=35||d.p>=9;
+return `<h3>🎮 تحكّم بالمزرعة (أو اضغط قطاع بالـ 3D)</h3><div class="g" style="flex-wrap:wrap;margin-bottom:6px">${[['الكل',-1],['A',0],['B',1],['C',2]].map(a=>`<button class="${sel==a[1]?'on':''}" onclick="setSel(${a[1]})">${a[0]}</button>`).join('')}</div><div class="g" style="flex-wrap:wrap"><button class="${I?'on':''}" onclick="act('irr')">${I?'🛑 إيقاف الري':'💦 تشغيل الري'}</button><button class="${C?'on':''}" onclick="act('cov')">${C?'🔓 كشف المحصول':'🧺 تغطية المحصول'}</button></div><div class="t">${rI==I?'✅':'⚠️'} الري: أفق يوصي بـ${rI?'التشغيل':'الإيقاف'} • ${rC==C?'✅':'⚠️'} التغطية: أفق يوصي بـ${rC?'التغطية':'الكشف'}</div>`}
+
+function ui(){
+  const safeDay = Math.min(day, D.length - 1);
+  const d=D[safeDay];
+  if(!d) return;
+
+  d.s = stat(d);
+  showInAppBanner(`📅 <b>${d.is_forecast ? 'توقعات مستقبلي' : dt(safeDay)}:</b><br>${d.s[0]}`, d.s[1]);
+
+  $("dd").value=new Date(Date.UTC(2022,8,1+safeDay)).toISOString().slice(0,10);let h='';
+  if(M==1){const pl=PLAN&&PLAN[safeDay];grT=safeDay<sow?0:cl((safeDay-sow)/45);
+  h=`<h3>القراءة الفضائية • ${d.is_forecast ? '🔮 تنبؤ مستقبلي' : dt(safeDay) + ' 2022'}</h3><div class="d">${d.tx.toFixed(1)}° / ${d.tn.toFixed(1)}°</div><div id="st" style="background:${d.s[1]}">${d.s[0]}</div>
+  <div class="m"><div>رطوبة السطح GWETTOP<b>${d.gt.toFixed(2)}</b></div><div>رطوبة الجذور GWETROOT<b>${d.gr.toFixed(2)}</b></div><div>مطر اليوم / التراكمي<b>${d.p} / ${d.cum.toFixed(1)} ملم</b></div><div>احتياج الري (Hargreaves)<b>${d.ir.toFixed(1)} ملم</b></div><div>رطوبة هواء / رياح<b>${Math.round(d.rh)}% / ${d.ws}</b></div><div>ملاءمة البذر<b>${d.sc}/100</b></div></div>
+  <div class="t" style="background:#58eb4c1a;border:1px solid #58eb4c44">🌾 <b>مؤشر مرونة المحصول (CRI):</b> <span style="font-size:14px;font-weight:900;color:#58eb4c">${d.cri}%</span><div style="background:#12301a;border-radius:4px;height:6px;width:100%;margin-top:4px;overflow:hidden"><div style="background:#58eb4c;height:100%;width:${d.cri}%"></div></div></div>
+  <div class="t"><u>🛰 قرار اليوم</u>${safeDay<sow?`أول بذر موصى به: <b>${dt(sow)}</b> (بعد تراكم ${D[sow].cum.toFixed(1)} ملم مع رطوبة سطح ≥0.19). قبله لا تبذر.`:'التربة جاهزة — المحصول ينمو في المجسّم 3D.'}</div>`+
+  (pl?`<div class="t"><u>🌿 مناخات مصغّرة</u>${pl.micro_climate_swapping}</div><div class="t"><u>💧 ري موجّه</u>${pl.space_guided_irrigation}</div><div class="t"><u>🧱 تعافي التربة</u>${pl.soil_regeneration}</div>`:'')}
+  else{grT=1;const sc=sched(season),F=season+1;
+  h=`<h3>الموسم ${F} من 3 — تناوب 3 قطاعات</h3>`+sc.map((k,i)=>`<div class="t"><u>قطاع ${'ABC'[i]}: ${CR[k][0]}</u>${CR[k][3]} (${SH[k]>0?'+':''}${SH[k]} نقطة صحة تربة)</div>`).join('');
+  let r=60,m=60;for(let s=0;s<=season;s++){r+=sched(s).reduce((a,k)=>a+SH[k],0)/3;m+=SH[cer()]}
+  h+=`<div class="m"><div>صحة التربة مع التناوب<b style="color:#58eb4c">${r.toFixed(0)}</b></div><div>زراعة حبوب متكررة<b style="color:#ff6a3c">${m.toFixed(0)}</b></div></div><div class="t">كل قطاع يتبدّل محصوله كل موسم: بقوليات ← حبوب ← راحة. نموذج توضيحي لتأثير النيتروجين (قابل للمعايرة بتحليل تربة).</div>`}
+  h+=`<div class="t" style="border:1px solid #58eb4c55">🎯 ${{w:'هدفك: توفير الماء — الري فقط عند عجز الرطوبة، والشعير/الحمص أولوية.',y:'هدفك: الإنتاجية — القمح بعد البقوليات للاستفادة من نيتروجينها.',d:'هدفك: مقاومة الجفاف — شعير + تغطية عضوية وبذر فور أول مطرة مؤثرة.'}[goal]}</div>`;$('info').innerHTML=actH()+h;roi();draw()
+}
+
+const dp=$('dr');dp.oninput=roi;function roi(){const a=+dp.value;$('dv').textContent=a;let mult=1.0;if(goal==='w')mult=1.25;if(goal==='d')mult=1.15;if(goal==='y')mult=0.9;const adjSav=Math.min(0.85,sav*mult);const m=(base-smart*(2-mult))*a;$('rw').textContent=Math.round(m) + ' m³';$('rm').textContent=Math.round(m*1.2) + ' $';$('rt').innerHTML=`استراتيجية موجهة لـ <b>${{w:'توفير المياه الأقصى',y:'تحقيق أقصى إنتاجية',d:'تعزيز الصمود ضد الجفاف'}[goal]}</b>: توفير نحو <b>${Math.round(adjSav*100)}%</b> مقارنة بالري التقليدي.`}
+
+function draw(){
+  const c=$('ch'),x=c.getContext('2d'),W=c.width=c.clientWidth*2,H=c.height=c.clientHeight*2,T=44,B=H-8,h=B-T,X=i=>W-(i+.5)/N*W;x.clearRect(0,0,W,H);
+  if(M==2){x.font='bold 26px Cairo';x.textAlign='center';[0,1,2].forEach(s=>{x.fillStyle=s==season?'#58eb4c':'#ffffff22';x.fillRect(W-(s+1)*W/3+6,0,W/3-12,H);x.fillStyle=s==season?'#07140a':'#9cb';x.fillText('الموسم '+(s+1),W-(s+.5)*W/3,H/2+8)});return}
+  const ms=[0,30,61,91,N],mn=['September','October','November','December','Forecast'];x.font='bold 22px Cairo';x.textAlign='center';
+  mn.forEach((m,k)=>{const a=W-ms[k]/N*W,b=W-ms[k+1]/N*W;x.fillStyle=k%2?'#ffffff0a':'#ffffff14';x.fillRect(b,0,a-b,H);x.fillStyle='#cfe';x.fillText(m,(a+b)/2,28)});
+  x.strokeStyle='#ffffff22';x.lineWidth=1;[0,.5,1].forEach(f=>{x.beginPath();x.moveTo(0,B-f*h);x.lineTo(W,B-f*h);x.stroke()});
+
+  x.fillStyle='#58eb4c44';x.strokeStyle='#58eb4c';x.lineWidth=2;x.beginPath();x.moveTo(X(0),B);D.forEach((d,i)=>x.lineTo(X(i),B-d.sc/100*h));x.lineTo(X(N-1),B);x.fill();x.beginPath();D.forEach((d,i)=>{const y=B-d.sc/100*h;i?x.lineTo(X(i),y):x.moveTo(X(i),y)});x.stroke();
+
+  D.forEach((d,i)=>{
+    const bh=Math.min(1,d.p/16)*h;
+    x.fillStyle = d.is_forecast ? '#ff8a3c' : '#4aa3ff';
+    x.fillRect(X(i)-W/N*.35,B-bh,W/N*.7,bh);
+  });
+
+  x.strokeStyle='#ff8a3c';x.lineWidth=4;x.beginPath();
+  D.forEach((d,i)=>{
+    const y=B-cl((d.tx-10)/34)*h;
+    if(i === 0) x.moveTo(X(i),y);
+    else {
+      if(d.is_forecast) x.setLineDash([6,4]); else x.setLineDash([]);
+      x.lineTo(X(i),y);
+      x.stroke();
+      x.beginPath();
+      x.moveTo(X(i),y);
+    }
+  });
+  x.setLineDash([]);
+
+  const mp=D.reduce((a,d,i)=>d.p>D[a].p?i:a,0),mt=D.reduce((a,d,i)=>d.tx>D[a].tx?i:a,0);x.font='bold 20px Cairo';x.fillStyle='#9fd0ff';x.fillText(D[mp].p+' mm',X(mp),B-D[mp].p/16*h-8);x.fillStyle='#ffb27a';x.fillText(D[mt].tx+'°C',X(mt),B-cl((D[mt].tx-10)/34)*h-8);
+  x.setLineDash([8,6]);x.strokeStyle='#58eb4c';x.lineWidth=3;x.beginPath();x.moveTo(X(sow),T);x.lineTo(X(sow),B);x.stroke();x.setLineDash([]);x.fillStyle='#58eb4c';x.fillText('🌱 بذر',X(sow),T+22);
+  
+  const safeDay = Math.min(day, D.length - 1);
+  const curD = D[safeDay];
+  x.fillStyle='#fff';x.fillRect(X(safeDay)-2,T,4,h);
+  const bub=(i,y,txt,bg)=>{x.font='bold 22px Cairo';const w=x.measureText(txt).width+24,cx=cl(X(i),w/2+4,W-w/2-4);x.fillStyle=bg;x.fillRect(cx-w/2,y,w,32);x.fillStyle='#07140a';x.fillText(txt,cx,y+23)};
+  if(hv>=0&&hv!=safeDay){const d=D[hv];if(d) bub(hv,T-6+h*.25,`${d.is_forecast ? 'توقع' : dt(hv)} • CRI: ${d.cri}% • مطر ${d.p} • ملاءمة ${d.sc}`,'#ffd27a')}
+  if(curD) bub(safeDay,6,curD.is_forecast ? '🔮 توقعات مستقبلية' : dt(safeDay),'#fff')
+}
+
+const ch=$('ch');let sc=false;function pick(e){const r=ch.getBoundingClientRect(),f=(e.clientX-r.left)/r.width;if(M==1)day=cl(Math.round((1-f)*(N-1)),0,N-1);else season=cl(Math.floor((1-f)*3),0,2);ui()}
+ch.onpointerdown=e=>{sc=true;pick(e)};ch.onpointermove=e=>{const r=ch.getBoundingClientRect();hv=cl(Math.round((1-(e.clientX-r.left)/r.width)*(N-1)),0,N-1);sc?pick(e):draw()};ch.onpointerleave=()=>{hv=-1;draw()};addEventListener('pointerup',()=>sc=false);
+let tm=null,hv=-1;function step(k){if(M==2)mode(1);day=cl(day+k,0,N-1);ui()}function setDate(v){const p=v.split('-').map(Number);if(p.length<3||!p[0])return;if(M==2)mode(1);day=cl(Math.round((Date.UTC(p[0],p[1]-1,p[2])-Date.UTC(2022,8,1))/864e5),0,N-1);ui()}
+const J=[['🌱 بذر',sow],['⛈ مطر',D.reduce((a,d,i)=>d.p>D[a].p?i:a,0)],['🔥 حرارة',D.reduce((a,d,i)=>d.tx>D[a].tx?i:a,0)]];$('jp').innerHTML=J.map((j,k)=>`<button onclick="step(0);day=${j[1]};if(M==2)mode(1);ui()">${j[0]}</button>`).join('');function play(){if(tm){clearInterval(tm);tm=null;$('pl').textContent='▶ تشغيل';return}$('pl').textContent='⏸ إيقاف';tm=setInterval(()=>{if(M==1){day=(day+1)%N}else season=(season+1)%3;ui()},M==1?140:1600)}
+function mode(m){M=m;$('m1').className=m==1?'on':'';$('m2').className=m==2?'on':'';if(tm){play();play()}if(m==2){gr=0}ui()}
+$('goals').onclick=e=>{const g=e.target.dataset.g;if(!g)return;goal=g;[...$('goals').children].forEach(b=>b.className=b.dataset.g==g?'on':'');ui()};
+
+// ---------- الخريطة الحرارية ----------
+function toggleHeatmap() {
+  heatmapActive = !heatmapActive;
+  const btn = $('btn-heatmap');
+  if(heatmapActive) {
+    btn.style.background = '#ff3366';
+    btn.innerHTML = '🗺️ إغلاق الخريطة الحرارية';
+    showInAppBanner("🗺️ تم تفعيل الخريطة الحرارية: الأطراف تجف بنسبة 30% أسرع من المركز", "#20b2aa");
+  } else {
+    btn.style.background = '#20b2aa';
+    btn.innerHTML = '🗺️ الخريطة الحرارية';
+  }
+  ui();
+}
+
+// ---------- سيناريوهات الأزمات ----------
+function triggerCrisis(type) {
+  if (M !== 1) mode(1);
+  const safeDay = Math.min(day, D.length - 1);
+  
+  if (type === 'dry') {
+    D[safeDay].tx = 42.0;
+    D[safeDay].gt = 0.04;
+    D[safeDay].p = 0.0;
+    D[safeDay].cri = 15;
+  } else if (type === 'rain') {
+    D[safeDay].tx = 15.0;
+    D[safeDay].gt = 0.48;
+    D[safeDay].p = 18.5;
+    D[safeDay].cri = 30;
+  }
+  
+  D[safeDay].ir = D[safeDay].gt >= 0.4 ? 0 : Math.max(0, D[safeDay].et - D[safeDay].p);
+  ui();
+
+  const title = type === 'dry' ? "🚨 سيناريو الإجهاد الحراري" : "🚨 سيناريو الأمطار الغزيرة";
+  if ("Notification" in window && Notification.permission === "granted") {
+    new Notification(title, { body: D[safeDay].s[0] });
+  }
+}
+
+function showInAppBanner(text, bg) {
+  let b = document.getElementById('app-banner');
+  if(!b) {
+    b = document.createElement('div');
+    b.id = 'app-banner';
+    b.style.cssText = 'position:fixed;top:70px;left:50%;transform:translateX(-50%);z-index:9999;padding:10px 18px;border-radius:10px;font-weight:900;color:#fff;box-shadow:0 4px 15px rgba(0,0,0,0.5);transition:all 0.3s;font-size:12px;text-align:center;max-width:90%;';
+    document.body.appendChild(b);
+  }
+  b.style.background = bg;
+  b.innerHTML = text;
+  b.style.display = 'block';
+}
+
+if ("Notification" in window && Notification.permission !== "granted") {
+  Notification.requestPermission();
+}
+
+// ---------- HybridDataManager Engine ----------
+class HybridDataManager {
+  async loadForecastData() {
+    try {
+      const lat = 32.2438, lon = 35.39;
+      const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max&forecast_days=7&timezone=Asia/Jerusalem`;
+      const response = await fetch(url);
+      const json = await response.json();
+
+      return json.daily.time.map((date, i) => {
+        const tx = json.daily.temperature_2m_max[i];
+        const tn = json.daily.temperature_2m_min[i];
+        const p = json.daily.precipitation_sum[i];
+        const ws = json.daily.wind_speed_10m_max[i];
+        const gt = Math.min(0.5, Math.max(0.05, 0.18 + (p * 0.02) - (tx * 0.003)));
+
+        return {
+          tx, tn, t: (tx + tn) / 2, rh: 55, ws, gt, gr: 0.45, p,
+          is_forecast: true
+        };
+      });
+    } catch (e) {
+      console.log('⚠️ فشل اتصال API التوقعات الخارجية — تشغيل خلية التوقع الاحتياطية (Prediction Cell)');
+      return this.generatePredictionCell();
+    }
+  }
+
+  generatePredictionCell() {
+    const last14 = D.slice(-14);
+    const avgTemp = last14.reduce((s, d) => s + d.tx, 0) / 14;
+    const avgRain = last14.reduce((s, d) => s + d.p, 0) / 14;
+    const forecast = [];
+
+    for (let i = 1; i <= 7; i++) {
+      const rand = 0.95 + Math.random() * 0.1;
+      const tx = Number((avgTemp * rand).toFixed(1));
+      const p = Number(Math.max(0, (avgRain * rand)).toFixed(1));
+      const gt = Math.min(0.5, Math.max(0.05, 0.18 + (p * 0.02) - (tx * 0.003)));
+
+      forecast.push({
+        tx, tn: tx - 8, t: tx - 4, rh: 55, ws: 2.5, gt, gr: 0.45, p,
+        is_forecast: true
+      });
+    }
+    return forecast;
+  }
+
+  async init() {
+    const forecastData = await this.loadForecastData();
+    if(forecastData && forecastData.length > 0) {
+      D = [...D, ...forecastData];
+      N = D.length;
+      recalcStats();
+      ui();
+    }
+  }
+}
+
+// بدء التشغيل وإطلاق الرندر الـ 3D فوراً
+addEventListener('resize',draw);
+roi();
+ui();
+requestAnimationFrame(frame);
+
+const hybridManager = new HybridDataManager();
+hybridManager.init();
+</script></body></html>
