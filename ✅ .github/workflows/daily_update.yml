@@ -1,0 +1,34 @@
+name: Ofoq Daily Data Pipeline
+
+on:
+  schedule:
+    # يعمل كل يوم الساعة 00:00 بتوقيت UTC (وهو 3:00 صباحاً بتوقيت فلسطين)
+    - cron: '0 0 * * *'
+  workflow_dispatch:  # يسمح لك بتشغيله يدوياً بضغطة زر للاختبار
+
+jobs:
+  update-data:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 1. تحميل كود المستودع
+      uses: actions/checkout@v3
+      
+    - name: 2. إعداد بيئة Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+        
+    - name: 3. تثبيت المكتبات المطلوبة
+      run: pip install -r requirements.txt
+      
+    - name: 4. تشغيل كود معالجة البيانات
+      run: python pipeline.py
+      
+    - name: 5. حفظ ورفع الملفات الجديدة إلى GitHub
+      run: |
+        git config --global user.name 'Ofoq Bot'
+        git config --global user.email 'bot@ofoq.ps'
+        git add data/
+        git commit -m "تحديث تلقائي للبيانات: $(date +'%Y-%m-%d')" || echo "لا توجد تغييرات جديدة"
+        git push
