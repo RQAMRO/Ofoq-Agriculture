@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ofoq (أفق) - الزراعة الذكية</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f4f7f6; color: #333; margin: 0; padding: 20px; }
+        .container { max-width: 1000px; margin: 0 auto; background: white; padding: 30px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        h1 { color: #2c7a3d; text-align: center; }
+        .info-box { background: #e8f5e9; padding: 20px; border-radius: 10px; margin: 20px 0; border-right: 5px solid #2c7a3d; }
+        .chart-container { position: relative; height: 400px; margin-top: 30px; }
+        .loading { text-align: center; color: #666; font-size: 18px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🌾 Ofoq (أفق) - نظام التنبؤ الزراعي</h1>
+        <div id="loading" class="loading">جاري تحميل البيانات من ناسا...</div>
+        
+        <div id="dashboard" style="display: none;">
+            <div class="info-box">
+                <h3>📍 الموقع: النصارية، نابلس، فلسطين</h3>
+                <p><strong>آخر تحديث:</strong> <span id="lastUpdated"></span></p>
+                <p><strong>التوصية الحالية:</strong> <span id="currentRec" style="font-weight: bold; font-size: 1.1em;"></span></p>
+            </div>
+            
+            <div class="chart-container">
+                <canvas id="soilChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // جلب البيانات من ملف JSON الذي يولده البايثون
+        fetch('./data/ofoq_data.json')
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('dashboard').style.display = 'block';
+                
+                document.getElementById('lastUpdated').textContent = data.metadata.last_updated;
+                
+                const todayData = data.daily_data[data.daily_data.length - 1];
+                document.getElementById('currentRec').textContent = todayData.Recommendation;
+                
+                // إعداد الرسم البياني
+                const ctx = document.getElementById('soilChart').getContext('2d');
+                const labels = data.daily_data.map(d => d.DATE);
+                const soilData = data.daily_data.map(d => d.GWETROOT);
+                const isForecast = data.daily_data.map(d => d.is_forecast);
+                
+                // فصل الألوان للتاريخي والمتوقع
+                const pointColors = isForecast.map(f => f ? '#f39c12' : '#2c7a3d');
+                const lineColors = isForecast.map((f, i, arr) => {
+                    if (i === 0) return '#2c7a3d';
+                    return f ? '#f39c12' : '#2c7a3d';
+                });
+
+                new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: 'رطوبة التربة (GWETROOT)',
+                            data: soilData,
+                            borderColor: '#2c7a3d',
+                            segment: {
+                                borderColor: ctx => isForecast[ctx.p0DataIndex] ? '#f39c12' : '#2c7a3d',
+                                borderDash: ctx => isForecast[ctx.p0DataIndex] ? [6, 6] : undefined,
+                            },
+                            pointBackgroundColor: pointColors,
+                            fill: false,
+                            tension: 0.3
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            title: { display: true, text: 'تطور رطوبة التربة: بيانات حقيقية (أخضر) + توقعات 7 أيام (برتقالي متقطع)', font: { size: 16 } },
+                            annotation: {
+                                annotations: {
+                                    line1: { type: 'line', yMin: 0.47, yMax: 0.47, borderColor: 'red', borderDash: [5, 5], label: { content: 'حد التشبع', enabled: true } },
+                                    line2: { type: 'line', yMin: 0.19, yMax: 0.19, borderColor: 'orange', borderDash: [5, 5], label: { content: 'حد الجفاف', enabled: true } }
+                                }
+                            }
+                        },
+                        scales: {
+                            y: { min: 0, max: 0.6, title: { display: true, text: 'مستوى الرطوبة' } }
+                        }
+                    }
+                });
+            })
+            .catch(error => {
+                document.getElementById('loading').textContent = '❌ حدث خطأ في تحميل البيانات. تأكد من وجود مجلد data/ وملف ofoq_data.json';
+                console.error(error);
+            });
+    </script>
+</body>
+</html>
